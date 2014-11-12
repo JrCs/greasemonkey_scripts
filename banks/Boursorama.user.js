@@ -10,8 +10,14 @@
 // @updateURL     https://github.com/JrCs/greasemonkey_scripts/raw/master/banks/Boursorama.user.js
 // @require       http://code.jquery.com/jquery-1.11.1.min.js
 // @require       https://raw.githubusercontent.com/SheetJS/js-crc32/master/crc32.js
-// @grant         none
+// @grant       GM_addStyle
 // ==/UserScript==
+/*
+  - The @grant directive is needed to work around a design change introduced in GM 1.0,
+    It restores the sandbox. Don't use grant none
+
+  - Script test under Greasemonkey, NinjaKit and Tampermonkey
+*/
 
 try {
 
@@ -37,6 +43,8 @@ crcToNumber["EF489937"] = 8
 crcToNumber["53DB0FF3"] = 9
     
 var number2GridPosition;
+var padDecoded = false;
+var _simulateVirtualPad = true;
 
 /**
  * Convert a 32bit number to a hex string
@@ -53,7 +61,7 @@ function dec32ToHex(number) {
  * Second argument is the threshold
  * Return the imagedata data (pixels encoded in 32bit)
  */
-    function convertColor(image_data, threshold) {
+function convertColor(image_data, threshold) {
     var pix = image_data.data;
     for (var i = 0, n = pix.length; i < n; i += 4) {
         var luma  = Math.floor(pix[i] * .299 + pix[i + 1] * 0.587 + pix[i + 2] * 0.114);
@@ -66,6 +74,19 @@ function dec32ToHex(number) {
     return pix;
 };
 
+function simulateVirtualPad(use) {
+    if (typeof(use) === 'undefined')
+        return _simulateVirtualPad;
+
+    _simulateVirtualPad = use
+
+    $('#gm_password').toggle(_simulateVirtualPad)
+    $('#gm_submit_buttons').toggle(_simulateVirtualPad)
+
+    $('div#login-pad').toggle(!_simulateVirtualPad || debug)
+    $('.lvl-notice').toggle(!_simulateVirtualPad);
+};
+
 function decodeGrid(pad) {
     var canvas, ctx, imageData;
 
@@ -76,7 +97,7 @@ function decodeGrid(pad) {
     var numberPartWidth = 100; // image of one number width
     var numberPartHeight = 60; // image of one number height
 
-    var $body = $("body")
+    var $body = $("body");
 
     for (y = 0; y < nbRows; y++) { // each row
         for (x = 0; x < nbCols; x++) { // each col
@@ -138,9 +159,9 @@ function simulatePad() {
         if (debug) {
             console.log(grilleChar);
         }
-
         $(area[grilleChar]).click();
     }
+    return true;
 }
 
 function addPasswordInput() {
@@ -148,12 +169,13 @@ function addPasswordInput() {
     var $divControlPasswordInput = $('<div><input id="gm_password" type="password"'+
                                      'autocomplete="On" maxlength="12" placeholder="mot de passe"></div>')
     $("label#login-password-label").after($divControlPasswordInput);
-    $("#gm_password").on('change', simulatePad);
 }
 
 function addSubmitButton() {
+    var $form = $( "#identification_client" ).removeAttr('onsubmit'); // Remove old onsubmit
+
     // add a submit "button"
-    var $divControlButtonInput = $("<div>")
+    var $divControlButtonInput = $("<div id='gm_submit_buttons'>")
 
     var $resetInputButton = $('<a class="btn">Annuler</button>').css('margin','10px 3px')
     $resetInputButton.appendTo($divControlButtonInput);
@@ -161,14 +183,66 @@ function addSubmitButton() {
     $resetInputButton.on("click", function () {
         $("#gm_password").val('').trigger('change');
     });
-    
+
+    if (debug) {
+        var $debugInputButton = $('<a class="btn btn-facebook">Debug</button>').css('margin','10px 3px')
+        $debugInputButton.appendTo($divControlButtonInput);
+        // bind events
+        $debugInputButton.on("click", function () {
+            $form.trigger('submit', false) // not a real submit
+        });
+    }
+
     var $loginInputButton = $('<a class="btn btn-purple">Valider</button>').css('margin','10px 3px')
     $loginInputButton.appendTo($divControlButtonInput);
     // bind events
     $loginInputButton.on("click", function () {
         $('#login-pad #btn-submit').click();
     });
+
     $('#login-pad').after($divControlButtonInput);
+
+    $form.on('submit', function( event, realSubmit ) {
+        $('#gm_alert').hide(); // hide alert if one exist
+
+        realSubmit = realSubmit === false ? false : true;
+
+        if (simulateVirtualPad() === true) {
+            if (padDecoded !== true) {
+                var $grid = $("#login-pad img");
+                var gridImgSrc = $grid.attr("src");
+                $('<img/>', { 'src': gridImgSrc }).load(function () {
+                    $(this).remove(); // prevent memory leaks
+                    try {
+                        // console.time('decodeGrid')
+                        decodeGrid($grid.get(0));
+                        // console.timeEnd('decodeGrid')
+                        padDecoded = true;
+                        $form.trigger('submit', realSubmit);
+                    }
+                    catch(e) {
+                        if (e.name === "Error") {
+                            $('#gm_alert').text(e).show();
+                            // Restore the the virtual pad
+                            simulateVirtualPad(false);
+                        }
+                        else {
+                            throw(e)
+                        }
+                    }
+                });
+                return false;
+            }
+            else {
+                simulatePad()
+            }
+        }
+
+        // unsafeWindow is not supported by NinjaKit
+        var check =
+            typeof(unsafeWindow.checkForm) === 'function' ? unsafeWindow.checkForm($form.get(0)) : true;
+        return realSubmit ? check : false
+    });
 }
 
 function addScriptInfos() {
@@ -190,17 +264,26 @@ function customizeUi() {
 
     addScriptInfos();
 
+    var $gm_alert = $('<div id="gm_alert">')
+        .css({
+            "background-color": "#FFF5C6",
+            "color": "red",
+            "font-weight": "bolder",
+            "font-size": "larger",
+            "padding": "10px",
+            "border-radius": "6px"
+        });
+    $('#sas-login div.bd').prepend($gm_alert.hide());
+
     if (debug) {
         $('div.footer').hide();
         $('img.promo').hide();
         $('#login-pad_pass').attr('type','text');
         $('#login-pad_passfake').hide();
     }
-    else {
-        // hide the virtual pad
-        $("div#login-pad").hide()
-    }
-    $(".lvl-notice").hide();
+
+    simulateVirtualPad(true);
+
     $('#form-membre').hide();
     $('#form-client').show();
 }
@@ -213,34 +296,8 @@ function main() {
         return;
     }
 
-    var gridImgSrc = $grid.attr("src");
-    $('<img/>', { 'src': gridImgSrc }).load(function () {
-        $(this).remove(); // prevent memory leaks
-        try {
-            // console.time('decodeGrid')
-            decodeGrid($grid.get(0));
-            // console.timeEnd('decodeGrid')
-            customizeUi();
-        }
-        catch(e) {
-            if (e.name === "Error") {
-                var $message = $('<div>')
-                    .css({
-                        "background-color": "#FFF5C6",
-                        "color": "red",
-                        "font-weight": "bolder",
-                        "font-size": "larger",
-                        "padding": "10px",
-                        "border-radius": "6px"
-                    })
-                    .text(e);
-                $('#sas-login div.bd').prepend($message);
-            }
-            else {
-                throw(e)
-            }
-        }
-    });
+    customizeUi();
+
 };
 
 main();
