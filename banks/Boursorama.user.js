@@ -6,7 +6,7 @@
 // @description   Remove virtual keyboard and add a classic input text field for the password on Boursorama website.
 // @include       https://www.boursorama.com/connexion.phtml*
 // @include       http://localhost:63342/userscripts/tests/boursorama/Connexion.html
-// @version       0.2
+// @version       0.3
 // @updateURL     https://github.com/JrCs/greasemonkey_scripts/raw/master/banks/Boursorama.user.js
 // @require       http://code.jquery.com/jquery-1.11.1.min.js
 // @require       https://raw.githubusercontent.com/SheetJS/js-crc32/master/crc32.js
@@ -23,7 +23,7 @@ try {
 
 // Can't use GM_info with NinjaKit for safari
 var scriptName = 'Boursorama - No Virtual Keyboard'
-var version = '0.2';
+var version = '0.3';
 
 var debug = false;
 //var debug = true;
@@ -193,7 +193,7 @@ function addSubmitButton() {
         });
     }
 
-    var $loginInputButton = $('<a class="btn btn-purple" type="submit">Valider</button>').css('margin','10px 3px')
+    var $loginInputButton = $('<button class="btn btn-purple" type="submit">Valider</button>').css('margin','10px 3px')
     $loginInputButton.appendTo($divControlButtonInput);
     // bind events
     $loginInputButton.on("click", function () {
