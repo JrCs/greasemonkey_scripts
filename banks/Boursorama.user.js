@@ -6,7 +6,7 @@
 // @description   Remove virtual keyboard and add a classic input text field for the password on Boursorama website.
 // @include       https://www.boursorama.com/connexion.phtml*
 // @include       http://localhost:63342/userscripts/tests/boursorama/Connexion.html
-// @version       0.3
+// @version       0.4
 // @updateURL     https://github.com/JrCs/greasemonkey_scripts/raw/master/banks/Boursorama.user.js
 // @require       http://code.jquery.com/jquery-1.11.1.min.js
 // @require       https://raw.githubusercontent.com/SheetJS/js-crc32/master/crc32.js
@@ -23,7 +23,7 @@ try {
 
 // Can't use GM_info with NinjaKit for safari
 var scriptName = 'Boursorama - No Virtual Keyboard'
-var version = '0.3';
+var version = '0.4';
 
 var debug = false;
 //var debug = true;
@@ -31,16 +31,16 @@ var debug = false;
 var crcToNumber = new Object();
 
 crcToNumber["944E76AF"] = -1
-crcToNumber["540D2DAB"] = 0
-crcToNumber["2E08B635"] = 1
-crcToNumber["25097043"] = 2
-crcToNumber["216ED1C2"] = 3
-crcToNumber["4AC758FB"] = 4
-crcToNumber["9D0166E0"] = 5
-crcToNumber["F318276D"] = 6
-crcToNumber["04ED95E4"] = 7
-crcToNumber["EF489937"] = 8
-crcToNumber["53DB0FF3"] = 9
+crcToNumber["653FD012"] = 0
+crcToNumber["B50EE4B5"] = 1
+crcToNumber["F3FCE1BE"] = 2
+crcToNumber["D36CAE47"] = 3
+crcToNumber["5C5AB77C"] = 4
+crcToNumber["C8F141BE"] = 5
+crcToNumber["00BB1BE7"] = 6
+crcToNumber["A0200E20"] = 7
+crcToNumber["680547B8"] = 8
+crcToNumber["B5423375"] = 9
     
 var number2GridPosition;
 var padDecoded = false;
