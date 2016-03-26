@@ -1,308 +1,259 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name          Boursorama - No Virtual Keyboard
 // @namespace     org.jrcs
 // @author        JrCs
-// @copyright     2014, https://github.com/JrCs/greasemonkey_scripts
+// @copyright     2014-2016, https://github.com/JrCs/greasemonkey_scripts
 // @description   Remove virtual keyboard and add a classic input text field for the password on Boursorama website.
-// @include       https://www.boursorama.com/connexion.phtml*
-// @include       http://localhost:63342/userscripts/tests/boursorama/Connexion.html
-// @version       0.4
+// @include       https://clients.boursorama.com/connexion*
+// @include       http://localhost:5789/boursorama/Boursorama%20Banque.html*
+// @version       1.0
 // @updateURL     https://github.com/JrCs/greasemonkey_scripts/raw/master/banks/Boursorama.user.js
 // @require       http://code.jquery.com/jquery-1.11.1.min.js
 // @require       https://raw.githubusercontent.com/SheetJS/js-crc32/master/crc32.js
-// @grant       GM_addStyle
+// @grant         GM_addStyle
 // ==/UserScript==
 /*
-  - The @grant directive is needed to work around a design change introduced in GM 1.0,
-    It restores the sandbox. Don't use grant none
+ - The @grant directive is needed to work around a design change introduced in GM 1.0,
+ It restores the sandbox. Don't use grant none
 
-  - Script test under Greasemonkey, NinjaKit and Tampermonkey
-*/
+ - Script test under Greasemonkey, NinjaKit and Tampermonkey
+ */
 
 try {
 
-// Can't use GM_info with NinjaKit for safari
-var scriptName = 'Boursorama - No Virtual Keyboard'
-var version = '0.4';
+    // Can't use GM_info with NinjaKit for safari
+    var scriptName = 'Boursorama - No Virtual Keyboard'
+    var version = '1.0';
 
-var debug = false;
-//var debug = true;
+    var debug = false;
+    //var debug = true;
 
-var crcToNumber = new Object();
+    var crcToNumber = new Object();
 
-crcToNumber["944E76AF"] = -1
-crcToNumber["653FD012"] = 0
-crcToNumber["B50EE4B5"] = 1
-crcToNumber["F3FCE1BE"] = 2
-crcToNumber["D36CAE47"] = 3
-crcToNumber["5C5AB77C"] = 4
-crcToNumber["C8F141BE"] = 5
-crcToNumber["00BB1BE7"] = 6
-crcToNumber["A0200E20"] = 7
-crcToNumber["680547B8"] = 8
-crcToNumber["B5423375"] = 9
-    
-var number2GridPosition;
-var padDecoded = false;
-var _simulateVirtualPad = true;
+    crcToNumber["2A190808"] = -1
+    crcToNumber["14C79344"] = 0
+    crcToNumber["321A2A99"] = 1
+    crcToNumber["70E5E999"] = 2
+    crcToNumber["B6447353"] = 3
+    crcToNumber["C89A4D3B"] = 4
+    crcToNumber["5C8290F1"] = 5
+    crcToNumber["F164402B"] = 6
+    crcToNumber["371846FF"] = 7
+    crcToNumber["F219A449"] = 8
+    crcToNumber["DA6970E6"] = 9
 
-/**
- * Convert a 32bit number to a hex string
- */
-function dec32ToHex(number) {
-    if (number < 0) number = 0x100000000 + number;
-    var hexStr = number.toString(16).toUpperCase();
-    return Array(Math.max(8 - String(hexStr).length + 1, 0)).join(0) + hexStr
-}
+    var number2GridPosition;
+    var padDecoded = false;
+    var _simulateVirtualPad = true;
 
-/**
- * Convert a canvas imagedata to black and white
- * First argument is the imagedata object
- * Second argument is the threshold
- * Return the imagedata data (pixels encoded in 32bit)
- */
-function convertColor(image_data, threshold) {
-    var pix = image_data.data;
-    for (var i = 0, n = pix.length; i < n; i += 4) {
-        var luma  = Math.floor(pix[i] * .299 + pix[i + 1] * 0.587 + pix[i + 2] * 0.114);
-        var color = luma >= threshold ? 255 : 0;
-        pix[i]     = color; // red
-        pix[i + 1] = color; // green
-        pix[i + 2] = color; // blue
-        pix[i + 3] = 255;   // alpha
+    /**
+     * Convert a 32bit number to a hex string
+     */
+    function dec32ToHex(number) {
+        if (number < 0) number = 0x100000000 + number;
+        var hexStr = number.toString(16).toUpperCase();
+        return Array(Math.max(8 - String(hexStr).length + 1, 0)).join(0) + hexStr
     }
-    return pix;
-};
 
-function simulateVirtualPad(use) {
-    if (typeof(use) === 'undefined')
-        return _simulateVirtualPad;
+    /**
+     * Convert a canvas imagedata to black and white
+     * First argument is the imagedata object
+     * Second argument is the threshold
+     * Return the imagedata data (pixels encoded in 32bit)
+     */
+    function convertColor(image_data, threshold) {
+        var pix = image_data.data;
+        for (var i = 0, n = pix.length; i < n; i += 4) {
+            var luma  = Math.floor(pix[i] * .299 + pix[i + 1] * 0.587 + pix[i + 2] * 0.114);
+            var color = luma >= threshold ? 255 : 0;
+            pix[i]     = color; // red
+            pix[i + 1] = color; // green
+            pix[i + 2] = color; // blue
+            pix[i + 3] = 255;   // alpha
+        }
+        return pix;
+    };
 
-    _simulateVirtualPad = use
+    function simulateVirtualPad(use) {
+        if (typeof(use) === 'undefined') // Query if we use the virtual keyboard or not
+            return _simulateVirtualPad;
 
-    $('#gm_password').toggle(_simulateVirtualPad)
-    $('#gm_submit_buttons').toggle(_simulateVirtualPad)
+        _simulateVirtualPad = use // Force or not using virtual keyboard
 
-    $('div#login-pad').toggle(!_simulateVirtualPad || debug)
-    $('.lvl-notice').toggle(!_simulateVirtualPad);
-};
+        $('#gm_password').toggle(_simulateVirtualPad)
+        $('#gm_cancel_button').toggle(_simulateVirtualPad)
 
-function decodeGrid(pad) {
-    var canvas, ctx, imageData;
+        $('#form_fakePassword').toggle(!_simulateVirtualPad || debug) // Hide or not the original input password
+        $('.login-window__actions-mask > hx\\:include').toggle(!_simulateVirtualPad || debug) // Hide or not the original virtual keyboard
+        return use;
+    };
 
-    number2GridPosition = new Object();
+    function decodeGrid($grid) {
+        var nbCols = 4;
+        var nbRows = 3;
 
-    var nbCols = 3;
-    var nbRows = 4;
-    var numberPartWidth = 100; // image of one number width
-    var numberPartHeight = 60; // image of one number height
+        var canvas, ctx, imageData;
 
-    var $body = $("body");
+        number2GridPosition = new Object()
+        $images = $( "li span.sasmap__key img", $grid )
+        if ($images.size() === 0) {
+            throw new Error("Aucune grille d'identification trouvée. Utilisez le pavé virtuel !");
+        }
 
-    for (y = 0; y < nbRows; y++) { // each row
-        for (x = 0; x < nbCols; x++) { // each col
-            var gridPosition = (y * nbCols) + x;
-    
-            var canvas = $("<canvas/>")
-                .attr({ 'width': numberPartWidth, 'height': numberPartHeight })
-                .css({ 'display': 'inline', 'border': '1px solid red' })
-                .get(0); // Get the DOM element
+        var $body = $("body");
 
-            ctx = canvas.getContext('2d');
+        for (y = 0; y < nbRows; y++) { // each row
+            for (x = 0; x < nbCols; x++) { // each col
+                var gridPosition = (y * nbCols) + x;
 
-            ctx.drawImage(pad, x * numberPartWidth, y * numberPartHeight, numberPartWidth, numberPartHeight, 0, 0, numberPartWidth, numberPartHeight);
-            var imageData = ctx.getImageData(0, 0, numberPartWidth, numberPartHeight);
-            var pixels = convertColor(imageData, 240); // return a buffer of pixels encoded in 32bit
-            var imageCRC = dec32ToHex(CRC32.buf(pixels));
-            var number = crcToNumber[imageCRC];
-            
-            if (debug) {
-                ctx.putImageData(imageData, 0, 0);
-                var $numberElement =
-                    $("<span>")
-                    .css({ 'style': 'border-bottom: 1px solid red', 'font-family': '"Lucida Console", Monaco, monospace' })
-                    .text(" row=" + y + "; col=" + x +
-                          "; gridPosition=" + gridPosition + "; crc=" + imageCRC + " = " + number);
-                $body.append(canvas, $numberElement, '<br/>')
+                img = $images.get(gridPosition)
+                var canvas = $("<canvas/>")
+                        .attr({ 'width': img.width, 'height': img.height })
+                        .css({ 'display': 'inline', 'border': '1px solid red' })
+                        .get(0); // Get the DOM element
+
+                // Copy the image contents to the canvas
+                var ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0);
+
+                var imageData = ctx.getImageData(0, 0, img.width, img.height);
+                var pixels    = convertColor(imageData, 128); // return a buffer of pixels encoded in 32bit
+                var imageCRC  = dec32ToHex(CRC32.buf(pixels));
+                var number    = crcToNumber[imageCRC];
+
+                if (debug) {
+                    ctx.putImageData(imageData, 0, 0) // Fill canvas with the thresholded image
+                    var $numberElement =
+                            $("<span>")
+                            .css({ 'style': 'border-bottom: 1px solid red', 'font-family': '"Lucida Console", Monaco, monospace' })
+                            .text(" row=" + y + "; col=" + x +
+                                  "; gridPosition=" + gridPosition + "; crc=" + imageCRC + " = " + number)
+                    $body.append(canvas, $numberElement, '<br/>')
+                }
+                if (number < -1 || number > 9) {
+                    throw new Error("Décodage de la grille échoué " + number);
+                }
+
+                if (number != -1) {
+                    number2GridPosition[number] = gridPosition;
+                }
             }
-    
-            if (number < -1 || number > 9) {
-                throw new Error("Décodage de la grille échoué " + number);
-            }
+        }
 
-            if (number != -1) {
-                number2GridPosition[number] = gridPosition;
+        // Verify that all number are affected
+        for (n = 0; n < 10; n++) {
+            if (typeof number2GridPosition[n] === "undefined") {
+                throw new Error("Grille non decodée pour le chiffre " + n + ". Utilisez le pavé virtuel !");
+                break;
             }
         }
     }
-    
-    for (n = 0; n < 10; n++) {
-        if (typeof number2GridPosition[n] == "undefined") {
-            throw new Error("Grille non decodée pour le chiffre " + n + ". Utilisez le pavé virtuel !");
-            break;
-        }
-    }
 
-    return number2GridPosition;
-};
+    /**
+     * Called when user click on the link to log in
+     */
+    function simulatePad() {
+        $(".form-row__fake-password__cancel .icon-close2").first().click() // Remove old data
 
-/**
- * Called when user click on the link to log in
- */
-function simulatePad() {
-    $("#login-pad #btn-cancel").click(); // Clear old datas
-    var area = $("map area");
-
-    var password = $("#gm_password").val();
-    for (s = 0; s < password.length; s++) {
-        var grilleChar = number2GridPosition[password[s]];
-        if (debug) {
-            console.log(grilleChar);
-        }
-        $(area[grilleChar]).click();
-    }
-    return true;
-}
-
-function addPasswordInput() {
-    // Add an input without name so it will not be submit
-    var $divControlPasswordInput = $('<div><input id="gm_password" type="password"'+
-                                     'autocomplete="On" maxlength="12" placeholder="mot de passe"></div>')
-    $("label#login-password-label").after($divControlPasswordInput);
-}
-
-function addSubmitButton() {
-    var $form = $( "#identification_client" ).removeAttr('onsubmit'); // Remove old onsubmit
-
-    // add a submit "button"
-    var $divControlButtonInput = $("<div id='gm_submit_buttons'>")
-
-    var $resetInputButton = $('<a class="btn">Annuler</button>').css('margin','10px 3px')
-    $resetInputButton.appendTo($divControlButtonInput);
-     // bind events
-    $resetInputButton.on("click", function () {
-        $("#gm_password").val('').trigger('change');
-    });
-
-    if (debug) {
-        var $debugInputButton = $('<a class="btn btn-facebook">Debug</button>').css('margin','10px 3px')
-        $debugInputButton.appendTo($divControlButtonInput);
-        // bind events
-        $debugInputButton.on("click", function () {
-            $form.trigger('submit', false) // not a real submit
-        });
-    }
-
-    var $loginInputButton = $('<button class="btn btn-purple" type="submit">Valider</button>').css('margin','10px 3px')
-    $loginInputButton.appendTo($divControlButtonInput);
-    // bind events
-    $loginInputButton.on("click", function () {
-        $('#login-pad #btn-submit').click();
-    });
-
-    $('#login-pad').after($divControlButtonInput);
-
-    $form.on('submit', function( event, realSubmit ) {
-        $('#gm_alert').hide(); // hide alert if one exist
-
-        realSubmit = realSubmit === false ? false : true;
-
-        if (simulateVirtualPad() === true) {
-            if (padDecoded !== true) {
-                var $grid = $("#login-pad img");
-                var gridImgSrc = $grid.attr("src");
-                $('<img/>', { 'src': gridImgSrc }).load(function () {
-                    $(this).remove(); // prevent memory leaks
-                    try {
-                        // console.time('decodeGrid')
-                        decodeGrid($grid.get(0));
-                        // console.timeEnd('decodeGrid')
-                        padDecoded = true;
-                        $form.trigger('submit', realSubmit);
-                    }
-                    catch(e) {
-                        if (e.name === "Error") {
-                            $('#gm_alert').text(e).show();
-                            // Restore the the virtual pad
-                            simulateVirtualPad(false);
-                        }
-                        else {
-                            throw(e)
-                        }
-                    }
-                });
+        if (padDecoded !== true) {
+            var $grid = $("ul.password-input")
+            try {
+                // console.time('decodeGrid')
+                decodeGrid($grid);
+                // console.timeEnd('decodeGrid')
+                padDecoded = true;
+            }
+            catch(e) {
+                if (e.name === "Error") {
+                    $('#gm_alert').text(e).show();
+                    // Restore the the virtual pad
+                    simulateVirtualPad(false);
+                }
+                else {
+                    throw(e)
+                }
                 return false;
             }
-            else {
-                simulatePad()
-            }
         }
+        var $virtualKeyboard = $(".sasmap .sasmap__key") // array of keyboard key
 
-        // unsafeWindow is not supported by NinjaKit
-        var check =
-            typeof(unsafeWindow.checkForm) === 'function' ? unsafeWindow.checkForm($form.get(0)) : true;
-        return realSubmit ? check : false
-    });
-}
-
-function addScriptInfos() {
-    // add some info about this script
-    var $infos = $("<div>")
-        .css({ 'float': 'right','position': 'relative',
-               'top': '-4px', 'text-align': 'right',
-               'color': '#6C6C6C'})
-        .html(scriptName+'<br/>Version ' + version);
-    $('#sas-login span.title').after($infos);
-}
-
-function customizeUi() {
-    $("#login","#form-client").attr('placeholder','identifiant');
-
-    addPasswordInput();
-
-    addSubmitButton();
-
-    addScriptInfos();
-
-    var $gm_alert = $('<div id="gm_alert">')
-        .css({
-            "background-color": "#FFF5C6",
-            "color": "red",
-            "font-weight": "bolder",
-            "font-size": "larger",
-            "padding": "10px",
-            "border-radius": "6px"
-        });
-    $('#sas-login div.bd').prepend($gm_alert.hide());
-
-    if (debug) {
-        $('div.footer').hide();
-        $('img.promo').hide();
-        $('#login-pad_pass').attr('type','text');
-        $('#login-pad_passfake').hide();
+        var password = $("#gm_password").val();
+        for (s = 0; s < password.length; s++) {
+            var grilleChar = number2GridPosition[password[s]];
+            if (debug) {
+                console.log(grilleChar);
+            }
+            $($virtualKeyboard[grilleChar]).click();
+        }
+        return true;
     }
 
-    simulateVirtualPad(true);
+    function addPasswordInput() {
+        // Add an input without name so it will not be submit
+        var $divControlPasswordInput =
+                $('<input id="gm_password" type="password" class="form-row__fake-password"'+
+                  'autocomplete="On" maxlength="12">')
+                .on('change', function(event) {
+                    if (simulateVirtualPad() === true)
+                        simulatePad()
+                })
+        // Add another Cancel button (style take from original)
+        var $cancelButton=
+                $('<a id="gm_cancel_button" style="display: inline;" href="javascript://" class="form-row__fake-password__cancel"><span class="icon-close2"></span></a>')
+          .on('click', function() {
+              $divControlPasswordInput.val("").trigger("change") // Clear input password when Cancel button is click
+          })
 
-    $('#form-membre').hide();
-    $('#form-client').show();
-}
+          var $fakepasswordContainer = $('div[data-name="fakePassword"] .form-row__widget')
+          $fakepasswordContainer.append($divControlPasswordInput, $cancelButton)
 
-function main() {
-    var $grid = $("#login-pad img");
-    
-    if (!$grid || ($grid.length == 0)) {
-        alert("Aucune grille d'identification trouvee")
-        return;
+        $('#form_fakePassword', $fakepasswordContainer).toggle(debug) // Display or not the original password input
     }
 
-    customizeUi();
+    function addScriptInfos() {
+        // add some info about this script
+        var $infos = $("<div>")
+                .css({
+                    'color': 'white',
+                    'font-size': '11px',
+                    'line-height': '14px',
+                    'position': 'relative',
+                    'right': '-30px',
+                    'text-align': 'right',
+                    'top': '12px'
+                })
+                .html(scriptName+'<br/>Version ' + version);
+        $('.login-window').append($infos);
+    }
 
-};
+    function customizeUi() {
 
-main();
+        addPasswordInput();
 
-} // end try
+        addScriptInfos();
+
+        var $gm_alert = $('<div id="gm_alert">')
+                .css({
+                    "background-color": "#FFF5C6",
+                    "color": "red",
+                    "font-weight": "bolder",
+                    "font-size": "larger",
+                    "padding": "10px",
+                    "border-radius": "6px"
+                });
+        $('.login-window__actions-mask').prepend($gm_alert.hide()); // Add our own alert container
+
+        simulateVirtualPad(true);
+
+    }
+
+    function main() {
+        customizeUi();
+    };
+
+    main();
+}
+// end try
 
 catch(e) {
     console.error(e.message);
